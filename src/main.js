@@ -31,25 +31,25 @@ class MatchRevampScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b1220)
     this.add.rectangle(width / 2, height / 2, width - 14, height - 14, 0x101a2e).setStrokeStyle(2, 0x334155, 0.9)
 
-    // Premium-ish top HUD
-    this.add.rectangle(width / 2, 70, width - 20, 120, 0x111827, 0.92).setStrokeStyle(2, 0x475569, 0.9)
+    // Premium-ish top HUD (higher contrast/sharpness)
+    this.add.rectangle(width / 2, 70, width - 20, 120, 0x0b1324, 0.96).setStrokeStyle(2, 0x64748b, 0.95)
     this.add.text(width / 2, 28, 'EMOJI MAYHEM MATCH', {
-      fontSize: '24px', color: '#f8fafc', fontStyle: '900',
+      fontSize: '26px', color: '#f8fafc', fontStyle: '900', stroke: '#0f172a', strokeThickness: 3,
     }).setOrigin(0.5)
 
-    this.add.rectangle(98, 78, 160, 40, 0x1f2937, 0.95).setStrokeStyle(2, 0x64748b, 0.95)
-    this.add.rectangle(98, 118, 160, 30, 0x3f2a12, 0.95).setStrokeStyle(2, 0xa16207, 0.9)
-    this.add.rectangle(width - 82, 96, 128, 58, 0x3b1120, 0.95).setStrokeStyle(2, 0xbe185d, 0.9)
+    this.add.rectangle(100, 78, 168, 42, 0x1e293b, 0.98).setStrokeStyle(2, 0x94a3b8, 0.95)
+    this.add.rectangle(100, 118, 168, 30, 0x422006, 0.98).setStrokeStyle(2, 0xf59e0b, 0.95)
+    this.add.rectangle(width - 82, 96, 130, 60, 0x3b1120, 0.98).setStrokeStyle(2, 0xfb7185, 0.95)
 
-    this.scoreText = this.add.text(28, 66, 'Score: 0', { fontSize: '20px', color: '#f8fafc', fontStyle: '800' })
-    this.comboText = this.add.text(28, 106, 'Combo: x1', { fontSize: '16px', color: '#fde047', fontStyle: '800' })
-    this.timerText = this.add.text(width - 82, 96, `${this.timeLeft}s`, { fontSize: '24px', color: '#fb7185', fontStyle: '900' }).setOrigin(0.5)
+    this.scoreText = this.add.text(28, 66, 'Score: 0', { fontSize: '21px', color: '#f8fafc', fontStyle: '900', stroke: '#0f172a', strokeThickness: 2 })
+    this.comboText = this.add.text(28, 106, 'Combo: x1', { fontSize: '17px', color: '#fde047', fontStyle: '900', stroke: '#422006', strokeThickness: 2 })
+    this.timerText = this.add.text(width - 82, 96, `${this.timeLeft}s`, { fontSize: '25px', color: '#fb7185', fontStyle: '900', stroke: '#3b1120', strokeThickness: 2 }).setOrigin(0.5)
 
     // Board frame
     this.boardX = Math.floor((width - this.cols * this.cell) / 2)
     this.boardY = Math.floor((height - this.rows * this.cell) / 2) + 26
-    this.add.rectangle(width / 2, this.boardY + (this.rows * this.cell) / 2, this.cols * this.cell + 20, this.rows * this.cell + 20, 0x0f172a, 0.95)
-      .setStrokeStyle(3, 0x38bdf8, 0.5)
+    this.add.rectangle(width / 2, this.boardY + (this.rows * this.cell) / 2, this.cols * this.cell + 20, this.rows * this.cell + 20, 0x0b1020, 0.98)
+      .setStrokeStyle(3, 0x67e8f9, 0.65)
 
     // Bottom bar
     this.add.rectangle(width / 2, height - 38, width - 20, 54, 0x111827, 0.9).setStrokeStyle(2, 0x334155, 0.9)
@@ -113,13 +113,16 @@ class MatchRevampScene extends Phaser.Scene {
     const x = this.boardX + c * this.cell + this.cell / 2
     const y = this.boardY + r * this.cell + this.cell / 2
 
-    const bg = this.add.rectangle(x, y, this.cell - 6, this.cell - 6, 0x1e293b, 0.65).setStrokeStyle(1, 0x475569, 0.9)
+    // Invisible hit anchor (no visible tile container)
+    const bg = this.add.circle(x, y, 2, 0x000000, 0)
     const emoji = this.add.text(x, y + 1, this.emojis[type], {
-      fontSize: '42px',
+      fontSize: '56px',
       fontStyle: '900',
+      stroke: '#0b1020',
+      strokeThickness: 3,
     }).setOrigin(0.5)
 
-    const badge = this.add.text(x + 14, y - 16, '', {
+    const badge = this.add.text(x + 18, y - 20, '', {
       fontSize: '20px', color: '#f8fafc', stroke: '#111827', strokeThickness: 4, fontStyle: '900',
     }).setOrigin(0.5)
 
@@ -170,8 +173,9 @@ class MatchRevampScene extends Phaser.Scene {
   }
 
   setSelected(tile, on) {
-    tile.bg.setStrokeStyle(on ? 3 : 1, on ? 0x22d3ee : 0x475569, 0.95)
-    tile.emoji.setAlpha(on ? 0.82 : 1)
+    tile.emoji.setAlpha(on ? 0.85 : 1)
+    tile.emoji.setScale(on ? 1.06 : 1)
+    tile.emoji.setTint(on ? 0xe0f2fe : 0xffffff)
   }
 
   pickCell(x, y) {

@@ -30,16 +30,27 @@ class BrainrotMatchScene extends Phaser.Scene {
     this.bg = this.add.rectangle(width / 2, height / 2, width, height, 0x120b1f)
     this.add.rectangle(width / 2, height / 2, width - 18, height - 18, 0x1f1238, 1).setStrokeStyle(2, 0x9333ea, 0.4)
 
-    this.title = this.add.text(width / 2, 40, 'BRAINROT MATCH MAYHEM', {
-      fontFamily: 'Inter, system-ui', fontSize: '30px', color: '#f3e8ff', fontStyle: '900', stroke: '#5b21b6', strokeThickness: 4,
+    // Top HUD (mobile polished)
+    this.add.rectangle(width / 2, 62, width - 20, 106, 0x111827, 0.82).setStrokeStyle(2, 0x334155, 0.95)
+    this.title = this.add.text(width / 2, 28, 'BRAINROT MATCH MAYHEM', {
+      fontFamily: 'Inter, system-ui', fontSize: '22px', color: '#f8fafc', fontStyle: '900',
     }).setOrigin(0.5)
 
-    this.scoreText = this.add.text(18, 86, 'Score: 0', { fontSize: '22px', color: '#f8fafc', fontStyle: '700' })
-    this.comboText = this.add.text(18, 114, 'Combo: x1', { fontSize: '18px', color: '#facc15', fontStyle: '700' })
-    this.timerText = this.add.text(width - 16, 98, `${this.timeLeft}s`, { fontSize: '28px', color: '#fb7185', fontStyle: '900' }).setOrigin(1, 0.5)
+    this.scoreChip = this.add.rectangle(108, 78, 168, 38, 0x1f2937, 0.95).setStrokeStyle(2, 0x475569, 0.9)
+    this.comboChip = this.add.rectangle(108, 116, 168, 30, 0x3f2a12, 0.95).setStrokeStyle(2, 0xa16207, 0.9)
+    this.timerChip = this.add.rectangle(width - 78, 96, 120, 56, 0x2b1220, 0.95).setStrokeStyle(2, 0xbe185d, 0.9)
 
-    this.boardBack = this.add.rectangle(width / 2, height / 2 + 28, this.cols * this.cell + 18, this.rows * this.cell + 18, 0x0f172a, 0.85)
-      .setStrokeStyle(3, 0x60a5fa, 0.35)
+    this.scoreText = this.add.text(28, 67, 'Score: 0', { fontSize: '20px', color: '#f8fafc', fontStyle: '800' })
+    this.comboText = this.add.text(28, 106, 'Combo: x1', { fontSize: '16px', color: '#fde047', fontStyle: '800' })
+    this.timerText = this.add.text(width - 78, 96, `${this.timeLeft}s`, { fontSize: '24px', color: '#fb7185', fontStyle: '900' }).setOrigin(0.5)
+
+    this.boardBack = this.add.rectangle(width / 2, height / 2 + 24, this.cols * this.cell + 18, this.rows * this.cell + 18, 0x0f172a, 0.92)
+      .setStrokeStyle(3, 0x60a5fa, 0.45)
+
+    // Bottom action bar visual polish
+    this.add.rectangle(width / 2, height - 38, width - 20, 54, 0x111827, 0.86).setStrokeStyle(2, 0x334155, 0.9)
+    this.add.text(28, height - 49, '⚡ POWERUPS', { fontSize: '15px', color: '#93c5fd', fontStyle: '800' })
+    this.add.text(width - 24, height - 49, '💥 CHAOS ON', { fontSize: '15px', color: '#fda4af', fontStyle: '800' }).setOrigin(1, 0)
 
     this.offsetX = Math.floor((width - this.cols * this.cell) / 2)
     this.offsetY = Math.floor(height / 2 + 28 - (this.rows * this.cell) / 2)
@@ -242,8 +253,9 @@ class BrainrotMatchScene extends Phaser.Scene {
   }
 
   highlight(tile, on) {
-    tile.bg.setStrokeStyle(on ? 4 : 0, on ? 0xfacc15 : 0, on ? 1 : 0)
-    this.tweens.add({ targets: tile.sprite, scale: on ? 1.08 : 1.0, duration: 120 })
+    tile.bg.setStrokeStyle(on ? 4 : 0, on ? 0x22d3ee : 0, on ? 1 : 0)
+    // keep tile size stable on mobile; pulse alpha only
+    this.tweens.add({ targets: tile.sprite, alpha: on ? 0.85 : 1.0, duration: 90 })
   }
 
   tilePowerText(power) {

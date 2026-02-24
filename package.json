@@ -1,0 +1,22 @@
+{
+  "name": "brainrot-match-mayhem",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "playwright": "^1.58.2",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "homepage": "https://fujiwara-tofu-shop.github.io/brainrot-match-mayhem"
+}

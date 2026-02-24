@@ -21,7 +21,7 @@ class BrainrotMatchScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.json('manifest', '/memes/manifest.json')
+    this.load.json('manifest', `${import.meta.env.BASE_URL}memes/manifest.json`)
   }
 
   create() {
@@ -112,7 +112,10 @@ class BrainrotMatchScene extends Phaser.Scene {
     const manifest = this.cache.json.get('manifest') || []
     this.memeDefs = manifest.slice(0, 12)
 
-    this.memeDefs.forEach((m, i) => this.load.image(`meme_${i}`, m.file))
+    this.memeDefs.forEach((m, i) => {
+      const rel = String(m.file || '').replace(/^\/+/, '')
+      this.load.image(`meme_${i}`, `${import.meta.env.BASE_URL}${rel}`)
+    })
 
     this.load.once('complete', () => {
       this.initBoard()
@@ -127,10 +130,29 @@ class BrainrotMatchScene extends Phaser.Scene {
     for (let r = 0; r < this.rows; r++) {
       this.tiles[r] = []
       for (let c = 0; c < this.cols; c++) {
-        this.tiles[r][c] = this.spawnTile(c, r, this.randType(), true)
+        let type = this.randType()
+        let guard = 0
+        while (this.wouldMakeStartMatch(r, c, type) && guard < 20) {
+          type = this.randType()
+          guard++
+        }
+        this.tiles[r][c] = this.spawnTile(c, r, type, true)
       }
     }
-    this.resolveAllAutoMatches()
+  }
+
+  wouldMakeStartMatch(r, c, type) {
+    if (c >= 2) {
+      const a = this.tiles[r][c - 1]
+      const b = this.tiles[r][c - 2]
+      if (a && b && a.type === type && b.type === type) return true
+    }
+    if (r >= 2) {
+      const a = this.tiles[r - 1]?.[c]
+      const b = this.tiles[r - 2]?.[c]
+      if (a && b && a.type === type && b.type === type) return true
+    }
+    return false
   }
 
   startClock() {
@@ -357,8 +379,10 @@ class BrainrotMatchScene extends Phaser.Scene {
 
   async resolveMatchesLoop(matchObj) {
     let current = matchObj
+    let chainGuard = 0
 
-    while (current.cells.length) {
+    while (current.cells.length && chainGuard < 30) {
+      chainGuard++
       this.combo += 1
       this.comboText.setText(`Combo: x${this.combo}`)
       this.sfxCombo(this.combo)

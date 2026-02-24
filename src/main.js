@@ -1,413 +1,292 @@
 import './style.css'
 import Phaser from 'phaser'
 
-class BrainrotMatchScene extends Phaser.Scene {
+class MatchRevampScene extends Phaser.Scene {
   constructor() {
-    super('brainrot')
+    super('match')
     this.cols = 6
     this.rows = 6
     this.cell = 68
-    this.offsetX = 0
-    this.offsetY = 0
-    this.tiles = []
-    this.selected = null
+
+    this.boardX = 0
+    this.boardY = 0
+
+    this.grid = []
     this.busy = false
+
     this.score = 0
     this.combo = 1
-    this.timeLeft = 75
-    this.gameStarted = false
-    this.memeDefs = []
-    this.audioCtx = null
-  }
+    this.timeLeft = 90
 
-  preload() {
-    this.load.json('manifest', `${import.meta.env.BASE_URL}memes/manifest.json`)
+    this.drag = null
+
+    this.emojis = ['😂', '💀', '🔥', '🧠', '🫠', '🤡', '✨', '😈']
+    this.audioCtx = null
   }
 
   create() {
     const { width, height } = this.scale
 
-    this.bg = this.add.rectangle(width / 2, height / 2, width, height, 0x120b1f)
-    this.add.rectangle(width / 2, height / 2, width - 18, height - 18, 0x1f1238, 1).setStrokeStyle(2, 0x9333ea, 0.4)
+    // Background
+    this.add.rectangle(width / 2, height / 2, width, height, 0x0b1220)
+    this.add.rectangle(width / 2, height / 2, width - 14, height - 14, 0x101a2e).setStrokeStyle(2, 0x334155, 0.9)
 
-    // Top HUD (mobile polished)
-    this.add.rectangle(width / 2, 62, width - 20, 106, 0x111827, 0.82).setStrokeStyle(2, 0x334155, 0.95)
-    this.title = this.add.text(width / 2, 28, 'BRAINROT MATCH MAYHEM', {
-      fontFamily: 'Inter, system-ui', fontSize: '22px', color: '#f8fafc', fontStyle: '900',
+    // Premium-ish top HUD
+    this.add.rectangle(width / 2, 70, width - 20, 120, 0x111827, 0.92).setStrokeStyle(2, 0x475569, 0.9)
+    this.add.text(width / 2, 28, 'EMOJI MAYHEM MATCH', {
+      fontSize: '24px', color: '#f8fafc', fontStyle: '900',
     }).setOrigin(0.5)
 
-    this.scoreChip = this.add.rectangle(108, 78, 168, 38, 0x1f2937, 0.95).setStrokeStyle(2, 0x475569, 0.9)
-    this.comboChip = this.add.rectangle(108, 116, 168, 30, 0x3f2a12, 0.95).setStrokeStyle(2, 0xa16207, 0.9)
-    this.timerChip = this.add.rectangle(width - 78, 96, 120, 56, 0x2b1220, 0.95).setStrokeStyle(2, 0xbe185d, 0.9)
+    this.add.rectangle(98, 78, 160, 40, 0x1f2937, 0.95).setStrokeStyle(2, 0x64748b, 0.95)
+    this.add.rectangle(98, 118, 160, 30, 0x3f2a12, 0.95).setStrokeStyle(2, 0xa16207, 0.9)
+    this.add.rectangle(width - 82, 96, 128, 58, 0x3b1120, 0.95).setStrokeStyle(2, 0xbe185d, 0.9)
 
-    this.scoreText = this.add.text(28, 67, 'Score: 0', { fontSize: '20px', color: '#f8fafc', fontStyle: '800' })
+    this.scoreText = this.add.text(28, 66, 'Score: 0', { fontSize: '20px', color: '#f8fafc', fontStyle: '800' })
     this.comboText = this.add.text(28, 106, 'Combo: x1', { fontSize: '16px', color: '#fde047', fontStyle: '800' })
-    this.timerText = this.add.text(width - 78, 96, `${this.timeLeft}s`, { fontSize: '24px', color: '#fb7185', fontStyle: '900' }).setOrigin(0.5)
+    this.timerText = this.add.text(width - 82, 96, `${this.timeLeft}s`, { fontSize: '24px', color: '#fb7185', fontStyle: '900' }).setOrigin(0.5)
 
-    this.boardBack = this.add.rectangle(width / 2, height / 2 + 24, this.cols * this.cell + 18, this.rows * this.cell + 18, 0x0f172a, 0.92)
-      .setStrokeStyle(3, 0x60a5fa, 0.45)
+    // Board frame
+    this.boardX = Math.floor((width - this.cols * this.cell) / 2)
+    this.boardY = Math.floor((height - this.rows * this.cell) / 2) + 26
+    this.add.rectangle(width / 2, this.boardY + (this.rows * this.cell) / 2, this.cols * this.cell + 20, this.rows * this.cell + 20, 0x0f172a, 0.95)
+      .setStrokeStyle(3, 0x38bdf8, 0.5)
 
-    // Bottom action bar visual polish
-    this.add.rectangle(width / 2, height - 38, width - 20, 54, 0x111827, 0.86).setStrokeStyle(2, 0x334155, 0.9)
-    this.add.text(22, height - 52, '⚡ POWERUPS', { fontSize: '15px', color: '#93c5fd', fontStyle: '800' })
-    this.add.text(22, height - 30, 'Swipe tiles to swap', { fontSize: '14px', color: '#cbd5e1', fontStyle: '700' })
-    this.add.text(width - 22, height - 49, '💥 CHAOS ON', { fontSize: '15px', color: '#fda4af', fontStyle: '800' }).setOrigin(1, 0)
+    // Bottom bar
+    this.add.rectangle(width / 2, height - 38, width - 20, 54, 0x111827, 0.9).setStrokeStyle(2, 0x334155, 0.9)
+    this.add.text(20, height - 51, '⚡ Swipe to swap • 4=Line • 5=Bomb', { fontSize: '14px', color: '#bfdbfe', fontStyle: '700' })
 
-    this.offsetX = Math.floor((width - this.cols * this.cell) / 2)
-    this.offsetY = Math.floor(height / 2 + 28 - (this.rows * this.cell) / 2)
+    this.createStartOverlay()
+  }
 
+  createStartOverlay() {
+    const { width, height } = this.scale
     this.overlay = this.add.container(width / 2, height / 2)
-    const panel = this.add.rectangle(0, 0, width - 40, 250, 0x020617, 0.94).setStrokeStyle(2, 0xf472b6, 0.7)
-    const t1 = this.add.text(0, -70, '💀 MEME CASCADE MODE 💀', { fontSize: '30px', color: '#f0abfc', fontStyle: '900' }).setOrigin(0.5)
-    const t2 = this.add.text(0, -14, 'Swipe meme tiles. Trigger cursed powerups.', { fontSize: '18px', color: '#d1d5db' }).setOrigin(0.5)
-    const t3 = this.add.text(0, 18, '4-match = ROW/COL MEME BLAST • 5-match = BOMB', { fontSize: '15px', color: '#93c5fd', fontStyle: '700' }).setOrigin(0.5)
-    const cta = this.add.text(0, 82, 'TAP TO START', { fontSize: '36px', color: '#fde047', fontStyle: '900', stroke: '#854d0e', strokeThickness: 5 }).setOrigin(0.5)
-    this.tweens.add({ targets: cta, scale: 1.08, yoyo: true, repeat: -1, duration: 460 })
-    this.overlay.add([panel, t1, t2, t3, cta])
+    const p = this.add.rectangle(0, 0, width - 44, 240, 0x020617, 0.95).setStrokeStyle(2, 0xf472b6, 0.75)
+    const t1 = this.add.text(0, -62, '🧠 EMOJI BRAINROT MODE', { fontSize: '31px', color: '#f0abfc', fontStyle: '900' }).setOrigin(0.5)
+    const t2 = this.add.text(0, -14, 'Smooth swipe controls. Big tiles. Big combos.', { fontSize: '18px', color: '#d1d5db' }).setOrigin(0.5)
+    const t3 = this.add.text(0, 20, '4-match = line clear • 5-match = bomb', { fontSize: '16px', color: '#93c5fd', fontStyle: '700' }).setOrigin(0.5)
+    const cta = this.add.text(0, 80, 'TAP TO START', { fontSize: '36px', color: '#fde047', fontStyle: '900', stroke: '#854d0e', strokeThickness: 5 }).setOrigin(0.5)
+    this.tweens.add({ targets: cta, scale: 1.07, yoyo: true, repeat: -1, duration: 420 })
+    this.overlay.add([p, t1, t2, t3, cta])
     this.overlay.setDepth(100)
 
     this.input.once('pointerdown', () => this.startGame())
   }
 
-  initAudio() {
-    if (this.audioCtx) return
-    const Ctx = window.AudioContext || window.webkitAudioContext
-    if (!Ctx) return
-    this.audioCtx = new Ctx()
-  }
-
-  beep({ freq = 440, duration = 0.08, type = 'sine', gain = 0.06, slide = 0 } = {}) {
-    if (!this.audioCtx) return
-    const now = this.audioCtx.currentTime
-    const osc = this.audioCtx.createOscillator()
-    const g = this.audioCtx.createGain()
-    osc.type = type
-    osc.frequency.setValueAtTime(freq, now)
-    if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(70, freq + slide), now + duration)
-    g.gain.setValueAtTime(0.0001, now)
-    g.gain.exponentialRampToValueAtTime(gain, now + 0.01)
-    g.gain.exponentialRampToValueAtTime(0.0001, now + duration)
-    osc.connect(g)
-    g.connect(this.audioCtx.destination)
-    osc.start(now)
-    osc.stop(now + duration + 0.02)
-  }
-
-  sfxSwap() {
-    this.beep({ freq: 260, duration: 0.06, type: 'square', gain: 0.04, slide: 110 })
-  }
-
-  sfxMatch(count = 3) {
-    const base = 380 + count * 20
-    this.beep({ freq: base, duration: 0.08, type: 'triangle', gain: 0.06, slide: 120 })
-    setTimeout(() => this.beep({ freq: base * 1.2, duration: 0.1, type: 'sawtooth', gain: 0.05, slide: 160 }), 40)
-  }
-
-  sfxPower() {
-    this.beep({ freq: 200, duration: 0.16, type: 'sawtooth', gain: 0.08, slide: 900 })
-  }
-
-  sfxCombo(level) {
-    this.beep({ freq: 520 + level * 18, duration: 0.1, type: 'square', gain: 0.06, slide: 220 })
-  }
-
-  sfxBoom() {
-    this.beep({ freq: 120, duration: 0.2, type: 'sawtooth', gain: 0.1, slide: -70 })
-  }
-
   startGame() {
-    if (this.gameStarted) return
-    this.gameStarted = true
     this.overlay.destroy()
     this.initAudio()
+    this.buildInitialGrid()
+    this.bindInput()
 
-    const manifest = this.cache.json.get('manifest') || []
-    this.memeDefs = manifest.slice(0, 12)
-
-    this.memeDefs.forEach((m, i) => {
-      const rel = String(m.file || '').replace(/^\/+/, '')
-      this.load.image(`meme_${i}`, `${import.meta.env.BASE_URL}${rel}`)
-    })
-
-    this.load.once('complete', () => {
-      this.initBoard()
-      this.startClock()
-      this.enableInput()
-    })
-    this.load.start()
-  }
-
-  initBoard() {
-    this.tiles = []
-    for (let r = 0; r < this.rows; r++) {
-      this.tiles[r] = []
-      for (let c = 0; c < this.cols; c++) {
-        let type = this.randType()
-        let guard = 0
-        while (this.wouldMakeStartMatch(r, c, type) && guard < 20) {
-          type = this.randType()
-          guard++
-        }
-        this.tiles[r][c] = this.spawnTile(c, r, type, true)
-      }
-    }
-  }
-
-  wouldMakeStartMatch(r, c, type) {
-    if (c >= 2) {
-      const a = this.tiles[r][c - 1]
-      const b = this.tiles[r][c - 2]
-      if (a && b && a.type === type && b.type === type) return true
-    }
-    if (r >= 2) {
-      const a = this.tiles[r - 1]?.[c]
-      const b = this.tiles[r - 2]?.[c]
-      if (a && b && a.type === type && b.type === type) return true
-    }
-    return false
-  }
-
-  startClock() {
-    this.timeEvent = this.time.addEvent({
+    this.clock = this.time.addEvent({
       delay: 1000,
       loop: true,
       callback: () => {
         if (this.busy) return
-        this.timeLeft -= 1
+        this.timeLeft--
         this.timerText.setText(`${this.timeLeft}s`)
-        this.timerText.setScale(1.15)
-        this.tweens.add({ targets: this.timerText, scale: 1, duration: 150 })
-
-        if (Math.random() < 0.13) this.randomChaosEvent()
-
+        this.tweens.add({ targets: this.timerText, scale: 1.12, yoyo: true, duration: 120 })
+        if (Math.random() < 0.1) this.randomJuice()
         if (this.timeLeft <= 0) this.endGame()
       },
     })
   }
 
-  endGame() {
-    this.busy = true
-    this.input.removeAllListeners()
-    this.timeEvent?.remove(false)
-    this.sfxBoom()
-    this.cameras.main.shake(700, 0.02)
+  buildInitialGrid() {
+    this.grid = Array.from({ length: this.rows }, () => Array(this.cols).fill(null))
 
-    const { width, height } = this.scale
-    const over = this.add.container(width / 2, height / 2)
-    const panel = this.add.rectangle(0, 0, width - 46, 250, 0x020617, 0.95).setStrokeStyle(3, 0x22d3ee, 0.85)
-    const t1 = this.add.text(0, -62, 'ROUND OVER', { fontSize: '36px', color: '#f8fafc', fontStyle: '900' }).setOrigin(0.5)
-    const t2 = this.add.text(0, -10, `Final Score: ${this.score.toLocaleString()}`, { fontSize: '31px', color: '#fde047', fontStyle: '900' }).setOrigin(0.5)
-    const t3 = this.add.text(0, 38, 'Tap to replay the cursed run.', { fontSize: '18px', color: '#93c5fd' }).setOrigin(0.5)
-    const t4 = this.add.text(0, 80, '⚠️ Certified mobile brainrot', { fontSize: '16px', color: '#f0abfc' }).setOrigin(0.5)
-    over.add([panel, t1, t2, t3, t4])
-    over.setDepth(120)
-
-    this.input.once('pointerdown', () => this.scene.restart())
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        let type = this.randType()
+        let guard = 0
+        while (this.wouldMatchAt(r, c, type) && guard < 20) {
+          type = this.randType()
+          guard++
+        }
+        this.grid[r][c] = this.spawnTile(r, c, type)
+      }
+    }
   }
 
-  enableInput() {
-    let dragStart = null
+  spawnTile(r, c, type) {
+    const x = this.boardX + c * this.cell + this.cell / 2
+    const y = this.boardY + r * this.cell + this.cell / 2
 
+    const bg = this.add.rectangle(x, y, this.cell - 6, this.cell - 6, 0x1e293b, 0.65).setStrokeStyle(1, 0x475569, 0.9)
+    const emoji = this.add.text(x, y + 1, this.emojis[type], {
+      fontSize: '42px',
+      fontStyle: '900',
+    }).setOrigin(0.5)
+
+    const badge = this.add.text(x + 14, y - 16, '', {
+      fontSize: '20px', color: '#f8fafc', stroke: '#111827', strokeThickness: 4, fontStyle: '900',
+    }).setOrigin(0.5)
+
+    return { r, c, type, power: null, bg, emoji, badge }
+  }
+
+  bindInput() {
     this.input.on('pointerdown', (p) => {
       if (this.busy) return
-      const picked = this.pickTile(p.worldX, p.worldY)
-      if (!picked) return
-      dragStart = { ...picked, x: p.worldX, y: p.worldY }
-      const t = this.tiles[picked.r][picked.c]
-      if (t) this.highlight(t, true)
+      const cell = this.pickCell(p.worldX, p.worldY)
+      if (!cell) return
+      this.drag = { ...cell, sx: p.worldX, sy: p.worldY, used: false }
+      const t = this.grid[cell.r][cell.c]
+      if (t) this.setSelected(t, true)
     })
 
-    const finishDrag = (p) => {
-      if (!dragStart || this.busy) { dragStart = null; return }
-      const start = { r: dragStart.r, c: dragStart.c }
-      const startTile = this.tiles[start.r]?.[start.c]
-      if (startTile) this.highlight(startTile, false)
-
-      const dx = p.worldX - dragStart.x
-      const dy = p.worldY - dragStart.y
+    this.input.on('pointermove', (p) => {
+      if (!this.drag || this.busy || this.drag.used) return
+      const dx = p.worldX - this.drag.sx
+      const dy = p.worldY - this.drag.sy
       const absX = Math.abs(dx)
       const absY = Math.abs(dy)
+      if (Math.max(absX, absY) < 14) return
 
-      // swipe threshold; fallback to tap-select behavior if short drag
-      let target = null
-      if (Math.max(absX, absY) >= 18) {
-        if (absX > absY) target = { r: start.r, c: start.c + (dx > 0 ? 1 : -1) }
-        else target = { r: start.r + (dy > 0 ? 1 : -1), c: start.c }
-      } else {
-        // single tap selects, second adjacent tap swaps
-        const picked = this.pickTile(p.worldX, p.worldY)
-        if (picked) {
-          if (!this.selected) {
-            this.selected = picked
-            const t = this.tiles[picked.r]?.[picked.c]
-            if (t) this.highlight(t, true)
-            dragStart = null
-            return
-          }
-          const first = this.selected
-          const firstTile2 = this.tiles[first.r]?.[first.c]
-          if (first.r === picked.r && first.c === picked.c) {
-            if (firstTile2) this.highlight(firstTile2, false)
-            this.selected = null
-            dragStart = null
-            return
-          }
-          if (this.isAdjacent(first, picked)) {
-            if (firstTile2) this.highlight(firstTile2, false)
-            this.selected = null
-            this.trySwap(first, picked)
-            dragStart = null
-            return
-          }
-          if (firstTile2) this.highlight(firstTile2, false)
-          this.selected = picked
-          const t = this.tiles[picked.r]?.[picked.c]
-          if (t) this.highlight(t, true)
-          dragStart = null
-          return
-        }
+      let target
+      if (absX > absY) target = { r: this.drag.r, c: this.drag.c + (dx > 0 ? 1 : -1) }
+      else target = { r: this.drag.r + (dy > 0 ? 1 : -1), c: this.drag.c }
+
+      if (target.r < 0 || target.r >= this.rows || target.c < 0 || target.c >= this.cols) {
+        this.releaseDrag()
+        return
       }
 
-      if (target && target.r >= 0 && target.r < this.rows && target.c >= 0 && target.c < this.cols) {
-        this.trySwap(start, target)
-      }
-      dragStart = null
-    }
+      this.drag.used = true
+      this.trySwap({ r: this.drag.r, c: this.drag.c }, target)
+      this.releaseDrag()
+    })
 
-    this.input.on('pointerup', finishDrag)
-    this.input.on('pointerupoutside', finishDrag)
+    this.input.on('pointerup', () => this.releaseDrag())
+    this.input.on('pointerupoutside', () => this.releaseDrag())
   }
 
-  pickTile(x, y) {
-    const c = Math.floor((x - this.offsetX) / this.cell)
-    const r = Math.floor((y - this.offsetY) / this.cell)
+  releaseDrag() {
+    if (!this.drag) return
+    const t = this.grid[this.drag.r]?.[this.drag.c]
+    if (t) this.setSelected(t, false)
+    this.drag = null
+  }
+
+  setSelected(tile, on) {
+    tile.bg.setStrokeStyle(on ? 3 : 1, on ? 0x22d3ee : 0x475569, 0.95)
+    tile.emoji.setAlpha(on ? 0.82 : 1)
+  }
+
+  pickCell(x, y) {
+    const c = Math.floor((x - this.boardX) / this.cell)
+    const r = Math.floor((y - this.boardY) / this.cell)
     if (c < 0 || c >= this.cols || r < 0 || r >= this.rows) return null
     return { r, c }
   }
 
-  isAdjacent(a, b) {
-    return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1
-  }
-
-  highlight(tile, on) {
-    tile.bg.setStrokeStyle(on ? 4 : 0, on ? 0x22d3ee : 0, on ? 1 : 0)
-    // keep tile size stable on mobile; pulse alpha only
-    this.tweens.add({ targets: tile.sprite, alpha: on ? 0.85 : 1.0, duration: 90 })
-  }
-
-  tilePowerText(power) {
-    if (power === 'row') return '↔'
-    if (power === 'col') return '↕'
-    if (power === 'bomb') return '💥'
-    return ''
-  }
-
-  spawnTile(c, r, type, instant = false, power = null) {
-    const x = this.offsetX + c * this.cell + this.cell / 2
-    const y = this.offsetY + r * this.cell + this.cell / 2
-
-    const bg = this.add.rectangle(x, y, this.cell - 6, this.cell - 6, 0x1e293b, 0.45).setOrigin(0.5)
-    const sprite = this.add.image(x, instant ? y : y - 420, `meme_${type}`).setDisplaySize(this.cell - 10, this.cell - 10).setOrigin(0.5)
-    const badge = this.add.text(x + 12, y - 16, this.tilePowerText(power), {
-      fontSize: '20px', color: '#f8fafc', stroke: '#111827', strokeThickness: 4, fontStyle: '900',
-    }).setOrigin(0.5)
-    badge.setDepth(10)
-
-    if (!instant) this.tweens.add({ targets: sprite, y, duration: 260, ease: 'Back.Out' })
-
-    return { r, c, type, power, bg, sprite, badge }
-  }
-
   randType() {
-    return Math.floor(Math.random() * this.memeDefs.length)
+    return Math.floor(Math.random() * this.emojis.length)
+  }
+
+  wouldMatchAt(r, c, type) {
+    if (c >= 2) {
+      const a = this.grid[r][c - 1]
+      const b = this.grid[r][c - 2]
+      if (a && b && a.type === type && b.type === type) return true
+    }
+    if (r >= 2) {
+      const a = this.grid[r - 1][c]
+      const b = this.grid[r - 2][c]
+      if (a && b && a.type === type && b.type === type) return true
+    }
+    return false
   }
 
   async trySwap(a, b) {
     this.busy = true
     this.sfxSwap()
-    await this.animateSwap(a, b)
-    this.swapGrid(a, b)
 
-    let matches = this.findMatches()
-    if (!matches.cells.length) {
+    await this.animateSwap(a, b)
+    this.swapCells(a, b)
+
+    let match = this.findMatches()
+    if (!match.cells.length) {
       await this.animateSwap(a, b)
-      this.swapGrid(a, b)
+      this.swapCells(a, b)
       this.combo = 1
       this.comboText.setText('Combo: x1')
       this.busy = false
       return
     }
 
-    await this.resolveMatchesLoop(matches)
+    await this.resolveChain(match)
     this.busy = false
   }
 
   animateSwap(a, b) {
     return new Promise((resolve) => {
-      const tA = this.tiles[a.r][a.c]
-      const tB = this.tiles[b.r][b.c]
-      const ax = this.offsetX + a.c * this.cell + this.cell / 2
-      const ay = this.offsetY + a.r * this.cell + this.cell / 2
-      const bx = this.offsetX + b.c * this.cell + this.cell / 2
-      const by = this.offsetY + b.r * this.cell + this.cell / 2
-      this.tweens.add({ targets: [tA.sprite, tA.bg, tA.badge], x: bx, y: by, duration: 120, ease: 'Sine.Out' })
-      this.tweens.add({ targets: [tB.sprite, tB.bg, tB.badge], x: ax, y: ay, duration: 120, ease: 'Sine.Out', onComplete: resolve })
+      const A = this.grid[a.r][a.c]
+      const B = this.grid[b.r][b.c]
+      const ax = this.boardX + a.c * this.cell + this.cell / 2
+      const ay = this.boardY + a.r * this.cell + this.cell / 2
+      const bx = this.boardX + b.c * this.cell + this.cell / 2
+      const by = this.boardY + b.r * this.cell + this.cell / 2
+
+      this.tweens.add({ targets: [A.bg, A.emoji, A.badge], x: bx, y: by, duration: 95, ease: 'Sine.Out' })
+      this.tweens.add({ targets: [B.bg, B.emoji, B.badge], x: ax, y: ay, duration: 95, ease: 'Sine.Out', onComplete: resolve })
     })
   }
 
-  swapGrid(a, b) {
-    const tmp = this.tiles[a.r][a.c]
-    this.tiles[a.r][a.c] = this.tiles[b.r][b.c]
-    this.tiles[b.r][b.c] = tmp
-    this.tiles[a.r][a.c].r = a.r; this.tiles[a.r][a.c].c = a.c
-    this.tiles[b.r][b.c].r = b.r; this.tiles[b.r][b.c].c = b.c
+  swapCells(a, b) {
+    const t = this.grid[a.r][a.c]
+    this.grid[a.r][a.c] = this.grid[b.r][b.c]
+    this.grid[b.r][b.c] = t
+    this.grid[a.r][a.c].r = a.r; this.grid[a.r][a.c].c = a.c
+    this.grid[b.r][b.c].r = b.r; this.grid[b.r][b.c].c = b.c
   }
 
   findMatches() {
-    const cellSet = new Set()
+    const set = new Set()
     const groups = []
 
-    // horizontal groups
+    // horizontal
     for (let r = 0; r < this.rows; r++) {
-      let runStart = 0
+      let start = 0
       for (let c = 1; c <= this.cols; c++) {
-        const same = c < this.cols && this.tiles[r][c] && this.tiles[r][c - 1] && this.tiles[r][c].type === this.tiles[r][c - 1].type
+        const same = c < this.cols && this.grid[r][c] && this.grid[r][c - 1] && this.grid[r][c].type === this.grid[r][c - 1].type
         if (!same) {
-          const len = c - runStart
+          const len = c - start
           if (len >= 3) {
             const cells = []
-            for (let k = runStart; k < c; k++) {
-              cellSet.add(`${r},${k}`)
+            for (let k = start; k < c; k++) {
+              set.add(`${r},${k}`)
               cells.push({ r, c: k })
             }
             groups.push({ orientation: 'h', len, cells })
           }
-          runStart = c
+          start = c
         }
       }
     }
 
-    // vertical groups
+    // vertical
     for (let c = 0; c < this.cols; c++) {
-      let runStart = 0
+      let start = 0
       for (let r = 1; r <= this.rows; r++) {
-        const same = r < this.rows && this.tiles[r][c] && this.tiles[r - 1][c] && this.tiles[r][c].type === this.tiles[r - 1][c].type
+        const same = r < this.rows && this.grid[r][c] && this.grid[r - 1][c] && this.grid[r][c].type === this.grid[r - 1][c].type
         if (!same) {
-          const len = r - runStart
+          const len = r - start
           if (len >= 3) {
             const cells = []
-            for (let k = runStart; k < r; k++) {
-              cellSet.add(`${k},${c}`)
+            for (let k = start; k < r; k++) {
+              set.add(`${k},${c}`)
               cells.push({ r: k, c })
             }
             groups.push({ orientation: 'v', len, cells })
           }
-          runStart = r
+          start = r
         }
       }
     }
 
-    const cells = Array.from(cellSet).map((s) => {
+    const cells = Array.from(set).map((s) => {
       const [r, c] = s.split(',').map(Number)
       return { r, c }
     })
@@ -415,66 +294,63 @@ class BrainrotMatchScene extends Phaser.Scene {
     return { cells, groups }
   }
 
-  choosePowerupSpawns(groups) {
-    const spawns = []
+  choosePowerups(groups) {
+    const out = []
     for (const g of groups) {
       if (g.len < 4) continue
       const pivot = Phaser.Utils.Array.GetRandom(g.cells)
       const power = g.len >= 5 ? 'bomb' : (g.orientation === 'h' ? 'row' : 'col')
-      spawns.push({ ...pivot, power })
+      out.push({ ...pivot, power })
     }
-    return spawns
+    return out
   }
 
-  async resolveMatchesLoop(matchObj) {
-    let current = matchObj
-    let chainGuard = 0
+  async resolveChain(match) {
+    let current = match
+    let chain = 0
 
-    while (current.cells.length && chainGuard < 30) {
-      chainGuard++
-      this.combo += 1
+    while (current.cells.length && chain < 25) {
+      chain++
+      this.combo++
       this.comboText.setText(`Combo: x${this.combo}`)
       this.sfxCombo(this.combo)
 
-      const spawns = this.choosePowerupSpawns(current.groups)
-      const spawnMap = new Map(spawns.map((s) => [`${s.r},${s.c}`, s.power]))
+      const powerSpawns = this.choosePowerups(current.groups)
+      const spawnMap = new Map(powerSpawns.map((p) => [`${p.r},${p.c}`, p.power]))
 
-      // cells to remove (excluding spawn cells)
-      let blastCells = current.cells.filter(({ r, c }) => !spawnMap.has(`${r},${c}`))
+      let blast = current.cells.filter(({ r, c }) => !spawnMap.has(`${r},${c}`))
 
-      // trigger existing power tiles that are being removed
-      const expanded = new Set(blastCells.map(({ r, c }) => `${r},${c}`))
-      for (const { r, c } of blastCells) {
-        const t = this.tiles[r][c]
-        if (!t?.power) continue
-        this.expandPowerTargets(t, expanded)
+      // Trigger existing powers in blast set
+      const expanded = new Set(blast.map(({ r, c }) => `${r},${c}`))
+      for (const { r, c } of blast) {
+        const t = this.grid[r][c]
+        if (t?.power) this.expandPower(t, expanded)
       }
-      blastCells = Array.from(expanded).map((s) => {
+      blast = Array.from(expanded).map((s) => {
         const [r, c] = s.split(',').map(Number)
         return { r, c }
       })
 
-      // convert spawn tiles into powerups (don't delete)
-      for (const s of spawns) {
-        const t = this.tiles[s.r][s.c]
+      // Promote spawns to power tiles
+      for (const s of powerSpawns) {
+        const t = this.grid[s.r][s.c]
         if (!t) continue
         t.power = s.power
-        t.badge.setText(this.tilePowerText(s.power))
-        this.tweens.add({ targets: [t.sprite, t.badge], scale: 1.18, yoyo: true, duration: 150 })
+        t.badge.setText(s.power === 'row' ? '↔' : s.power === 'col' ? '↕' : '💥')
+        this.tweens.add({ targets: [t.emoji, t.badge], scale: 1.14, yoyo: true, duration: 120 })
         this.sfxPower()
       }
 
-      const scoreGain = blastCells.length * 85 * this.combo
-      this.addScore(scoreGain)
-      this.sfxMatch(blastCells.length)
+      this.addScore(blast.length * 90 * this.combo)
+      this.sfxMatch(blast.length)
+      await this.blastTiles(blast)
 
-      await this.blast(blastCells)
       this.applyGravity()
       await this.animateGravity()
-      this.fillEmpty()
+      this.fillNew()
       await this.animateFill()
 
-      if (Math.random() < 0.22) this.randomChaosEvent(true)
+      if (Math.random() < 0.12) this.randomJuice(true)
 
       current = this.findMatches()
     }
@@ -483,75 +359,56 @@ class BrainrotMatchScene extends Phaser.Scene {
     this.comboText.setText('Combo: x1')
   }
 
-  expandPowerTargets(tile, set) {
-    const { r, c, power } = tile
-    if (power === 'row') {
-      for (let x = 0; x < this.cols; x++) set.add(`${r},${x}`)
-      this.cameras.main.shake(180, 0.01)
-      this.popText('ROW WIPE')
-    } else if (power === 'col') {
-      for (let y = 0; y < this.rows; y++) set.add(`${y},${c}`)
-      this.cameras.main.shake(180, 0.01)
-      this.popText('COLUMN NUKE')
-    } else if (power === 'bomb') {
-      for (let y = r - 1; y <= r + 1; y++) {
-        for (let x = c - 1; x <= c + 1; x++) {
-          if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) set.add(`${y},${x}`)
+  expandPower(tile, out) {
+    if (tile.power === 'row') {
+      for (let c = 0; c < this.cols; c++) out.add(`${tile.r},${c}`)
+      this.pop('ROW BLAST')
+    } else if (tile.power === 'col') {
+      for (let r = 0; r < this.rows; r++) out.add(`${r},${tile.c}`)
+      this.pop('COLUMN BLAST')
+    } else if (tile.power === 'bomb') {
+      for (let r = tile.r - 1; r <= tile.r + 1; r++) {
+        for (let c = tile.c - 1; c <= tile.c + 1; c++) {
+          if (r >= 0 && r < this.rows && c >= 0 && c < this.cols) out.add(`${r},${c}`)
         }
       }
-      this.cameras.main.shake(250, 0.014)
-      this.popText('MEME BOMB')
+      this.pop('EMOJI BOMB')
       this.sfxBoom()
     }
   }
 
-  addScore(v) {
-    this.score += v
-    this.scoreText.setText(`Score: ${this.score.toLocaleString()}`)
-    if (v > 700) this.popText(`MEGA +${v}`)
-  }
-
-  popText(text) {
-    const { width } = this.scale
-    const t = this.add.text(width / 2, 155, text, {
-      fontSize: '34px', color: '#fef08a', fontStyle: '900', stroke: '#7c2d12', strokeThickness: 6,
-    }).setOrigin(0.5).setDepth(90)
-    this.tweens.add({ targets: t, y: t.y - 40, alpha: 0, duration: 620, onComplete: () => t.destroy() })
-  }
-
-  blast(cells) {
+  blastTiles(cells) {
     return new Promise((resolve) => {
       if (!cells.length) return resolve()
       this.cameras.main.shake(130, 0.006)
       let done = 0
 
       for (const { r, c } of cells) {
-        const t = this.tiles[r][c]
+        const t = this.grid[r][c]
         if (!t) { done++; if (done === cells.length) resolve(); continue }
 
         for (let i = 0; i < 6; i++) {
-          const p = this.add.circle(t.sprite.x, t.sprite.y, Phaser.Math.Between(2, 5), Phaser.Display.Color.RandomRGB().color)
-          const ang = Math.random() * Math.PI * 2
-          const dist = Phaser.Math.Between(16, 44)
+          const p = this.add.circle(t.emoji.x, t.emoji.y, Phaser.Math.Between(2, 5), Phaser.Display.Color.RandomRGB().color)
+          const a = Math.random() * Math.PI * 2
+          const d = Phaser.Math.Between(16, 44)
           this.tweens.add({
             targets: p,
-            x: p.x + Math.cos(ang) * dist,
-            y: p.y + Math.sin(ang) * dist,
+            x: p.x + Math.cos(a) * d,
+            y: p.y + Math.sin(a) * d,
             alpha: 0,
-            duration: 250,
+            duration: 220,
             onComplete: () => p.destroy(),
           })
         }
 
         this.tweens.add({
-          targets: [t.sprite, t.bg, t.badge],
+          targets: [t.bg, t.emoji, t.badge],
           scale: 0,
           alpha: 0,
-          angle: Phaser.Math.Between(-24, 24),
-          duration: 160,
+          duration: 150,
           onComplete: () => {
-            t.sprite.destroy(); t.bg.destroy(); t.badge.destroy()
-            this.tiles[r][c] = null
+            t.bg.destroy(); t.emoji.destroy(); t.badge.destroy()
+            this.grid[r][c] = null
             done++
             if (done === cells.length) resolve()
           },
@@ -564,11 +421,11 @@ class BrainrotMatchScene extends Phaser.Scene {
     for (let c = 0; c < this.cols; c++) {
       let write = this.rows - 1
       for (let r = this.rows - 1; r >= 0; r--) {
-        if (this.tiles[r][c]) {
+        if (this.grid[r][c]) {
           if (write !== r) {
-            this.tiles[write][c] = this.tiles[r][c]
-            this.tiles[write][c].r = write
-            this.tiles[r][c] = null
+            this.grid[write][c] = this.grid[r][c]
+            this.grid[write][c].r = write
+            this.grid[r][c] = null
           }
           write--
         }
@@ -578,34 +435,33 @@ class BrainrotMatchScene extends Phaser.Scene {
 
   animateGravity() {
     return new Promise((resolve) => {
-      const tasks = []
+      const jobs = []
       for (let r = 0; r < this.rows; r++) {
         for (let c = 0; c < this.cols; c++) {
-          const t = this.tiles[r][c]
+          const t = this.grid[r][c]
           if (!t) continue
-          const y = this.offsetY + r * this.cell + this.cell / 2
-          const x = this.offsetX + c * this.cell + this.cell / 2
-          if (Math.abs(t.sprite.y - y) > 1 || Math.abs(t.sprite.x - x) > 1) {
-            tasks.push(new Promise((res) => {
-              this.tweens.add({ targets: [t.sprite, t.bg, t.badge], x, y, duration: 170 + (this.rows - r) * 10, ease: 'Bounce.Out', onComplete: res })
+          const x = this.boardX + c * this.cell + this.cell / 2
+          const y = this.boardY + r * this.cell + this.cell / 2
+          if (Math.abs(t.emoji.y - y) > 1 || Math.abs(t.emoji.x - x) > 1) {
+            jobs.push(new Promise((done) => {
+              this.tweens.add({ targets: [t.bg, t.emoji, t.badge], x, y, duration: 160, ease: 'Quad.Out', onComplete: done })
             }))
           }
         }
       }
-      Promise.all(tasks).then(() => resolve())
-      if (!tasks.length) resolve()
+      Promise.all(jobs).then(resolve)
+      if (!jobs.length) resolve()
     })
   }
 
-  fillEmpty() {
+  fillNew() {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
-        if (!this.tiles[r][c]) {
-          const t = this.spawnTile(c, r, this.randType(), false)
-          t.sprite.y -= Phaser.Math.Between(80, 220)
-          t.badge.y = t.sprite.y
-          t.bg.y = this.offsetY + r * this.cell + this.cell / 2
-          this.tiles[r][c] = t
+        if (!this.grid[r][c]) {
+          const t = this.spawnTile(r, c, this.randType())
+          t.emoji.y -= Phaser.Math.Between(80, 190)
+          t.badge.y = t.emoji.y
+          this.grid[r][c] = t
         }
       }
     }
@@ -613,76 +469,114 @@ class BrainrotMatchScene extends Phaser.Scene {
 
   animateFill() {
     return new Promise((resolve) => {
-      const tasks = []
+      const jobs = []
       for (let r = 0; r < this.rows; r++) {
         for (let c = 0; c < this.cols; c++) {
-          const t = this.tiles[r][c]
-          const y = this.offsetY + r * this.cell + this.cell / 2
-          const x = this.offsetX + c * this.cell + this.cell / 2
-          if (Math.abs(t.sprite.y - y) > 1 || Math.abs(t.sprite.x - x) > 1) {
-            tasks.push(new Promise((res) => this.tweens.add({ targets: [t.sprite, t.badge], x, y, duration: 230, ease: 'Back.Out', onComplete: res })))
+          const t = this.grid[r][c]
+          const x = this.boardX + c * this.cell + this.cell / 2
+          const y = this.boardY + r * this.cell + this.cell / 2
+          if (Math.abs(t.emoji.y - y) > 1) {
+            jobs.push(new Promise((done) => {
+              this.tweens.add({ targets: [t.emoji, t.badge], x, y, duration: 190, ease: 'Back.Out', onComplete: done })
+            }))
           }
         }
       }
-      Promise.all(tasks).then(resolve)
-      if (!tasks.length) resolve()
+      Promise.all(jobs).then(resolve)
+      if (!jobs.length) resolve()
     })
   }
 
-  resolveAllAutoMatches() {
-    const loop = async () => {
-      const m = this.findMatches()
-      if (!m.cells.length) return
-      await this.resolveMatchesLoop(m)
-      loop()
-    }
-    loop()
-  }
-
-  randomChaosEvent(inCascade = false) {
-    const roll = Math.random()
-    if (roll < 0.34) {
-      this.cameras.main.shake(300, 0.012)
-      this.popText('CHAOS SHAKE!')
-      this.addScore(200 * (inCascade ? 2 : 1))
+  randomJuice(inCascade = false) {
+    if (Math.random() < 0.5) {
+      this.cameras.main.shake(220, 0.008)
+      this.pop('CHAOS SHAKE')
+      this.addScore(inCascade ? 350 : 180)
       this.sfxPower()
-    } else if (roll < 0.67) {
+    } else {
       const r = Phaser.Math.Between(0, this.rows - 1)
       const c = Phaser.Math.Between(0, this.cols - 1)
-      const t = this.tiles[r][c]
-      if (t) {
-        t.type = this.randType()
-        t.power = Math.random() < 0.22 ? Phaser.Utils.Array.GetRandom(['row', 'col', 'bomb']) : null
-        t.sprite.setTexture(`meme_${t.type}`)
-        t.badge.setText(this.tilePowerText(t.power))
-        this.tweens.add({ targets: [t.sprite, t.badge], angle: 360, duration: 260, onComplete: () => { t.sprite.angle = 0; t.badge.angle = 0 } })
-        this.popText('MUTATION!')
-      }
-    } else {
-      const flat = []
-      for (let r = 0; r < this.rows; r++) for (let c = 0; c < this.cols; c++) flat.push(this.tiles[r][c])
-      Phaser.Utils.Array.Shuffle(flat)
-      let i = 0
-      for (let r = 0; r < this.rows; r++) {
-        for (let c = 0; c < this.cols; c++) {
-          const t = flat[i++]
-          this.tiles[r][c] = t
-          t.r = r; t.c = c
-          const x = this.offsetX + c * this.cell + this.cell / 2
-          const y = this.offsetY + r * this.cell + this.cell / 2
-          this.tweens.add({ targets: [t.sprite, t.bg, t.badge], x, y, duration: 220, ease: 'Sine.Out' })
-        }
-      }
-      this.popText('SHUFFLE STORM!')
-      this.sfxBoom()
+      const t = this.grid[r][c]
+      if (!t) return
+      t.type = this.randType()
+      t.emoji.setText(this.emojis[t.type])
+      t.power = Math.random() < 0.2 ? Phaser.Utils.Array.GetRandom(['row', 'col', 'bomb']) : null
+      t.badge.setText(t.power === 'row' ? '↔' : t.power === 'col' ? '↕' : t.power === 'bomb' ? '💥' : '')
+      this.tweens.add({ targets: [t.emoji, t.badge], angle: 360, duration: 220, onComplete: () => { t.emoji.angle = 0; t.badge.angle = 0 } })
+      this.pop('MUTATION')
     }
   }
+
+  addScore(v) {
+    this.score += v
+    this.scoreText.setText(`Score: ${this.score.toLocaleString()}`)
+    if (v > 700) this.pop(`MEGA +${v}`)
+  }
+
+  pop(text) {
+    const { width } = this.scale
+    const t = this.add.text(width / 2, 156, text, {
+      fontSize: '34px', color: '#fef08a', fontStyle: '900', stroke: '#7c2d12', strokeThickness: 6,
+    }).setOrigin(0.5).setDepth(90)
+    this.tweens.add({ targets: t, y: t.y - 38, alpha: 0, duration: 560, onComplete: () => t.destroy() })
+  }
+
+  endGame() {
+    this.busy = true
+    this.clock?.remove(false)
+    this.input.removeAllListeners()
+    this.sfxBoom()
+    this.cameras.main.shake(700, 0.02)
+
+    const { width, height } = this.scale
+    const o = this.add.container(width / 2, height / 2)
+    const p = this.add.rectangle(0, 0, width - 46, 250, 0x020617, 0.95).setStrokeStyle(3, 0x22d3ee, 0.85)
+    const t1 = this.add.text(0, -60, 'ROUND OVER', { fontSize: '36px', color: '#f8fafc', fontStyle: '900' }).setOrigin(0.5)
+    const t2 = this.add.text(0, -6, `Final Score: ${this.score.toLocaleString()}`, { fontSize: '30px', color: '#fde047', fontStyle: '900' }).setOrigin(0.5)
+    const t3 = this.add.text(0, 42, 'Tap to replay', { fontSize: '18px', color: '#93c5fd' }).setOrigin(0.5)
+    o.add([p, t1, t2, t3])
+    o.setDepth(110)
+
+    this.input.once('pointerdown', () => this.scene.restart())
+  }
+
+  initAudio() {
+    if (this.audioCtx) return
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    this.audioCtx = new Ctx()
+  }
+
+  beep({ freq = 440, duration = 0.08, type = 'sine', gain = 0.06, slide = 0 } = {}) {
+    if (!this.audioCtx) return
+    const now = this.audioCtx.currentTime
+    const o = this.audioCtx.createOscillator()
+    const g = this.audioCtx.createGain()
+    o.type = type
+    o.frequency.setValueAtTime(freq, now)
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(70, freq + slide), now + duration)
+    g.gain.setValueAtTime(0.0001, now)
+    g.gain.exponentialRampToValueAtTime(gain, now + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0001, now + duration)
+    o.connect(g); g.connect(this.audioCtx.destination)
+    o.start(now); o.stop(now + duration + 0.02)
+  }
+
+  sfxSwap() { this.beep({ freq: 280, duration: 0.06, type: 'square', gain: 0.04, slide: 90 }) }
+  sfxMatch(n = 3) {
+    const b = 380 + n * 16
+    this.beep({ freq: b, duration: 0.08, type: 'triangle', gain: 0.06, slide: 120 })
+    setTimeout(() => this.beep({ freq: b * 1.2, duration: 0.1, type: 'sawtooth', gain: 0.045, slide: 140 }), 36)
+  }
+  sfxCombo(level) { this.beep({ freq: 520 + level * 15, duration: 0.1, type: 'square', gain: 0.06, slide: 200 }) }
+  sfxPower() { this.beep({ freq: 210, duration: 0.16, type: 'sawtooth', gain: 0.08, slide: 800 }) }
+  sfxBoom() { this.beep({ freq: 120, duration: 0.2, type: 'sawtooth', gain: 0.1, slide: -70 }) }
 }
 
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'app',
-  backgroundColor: '#120b1f',
+  backgroundColor: '#0b1220',
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -690,5 +584,5 @@ new Phaser.Game({
     height: 860,
   },
   physics: { default: 'arcade' },
-  scene: [BrainrotMatchScene],
+  scene: [MatchRevampScene],
 })

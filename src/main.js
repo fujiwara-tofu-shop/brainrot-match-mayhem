@@ -4,9 +4,9 @@ import Phaser from 'phaser'
 class BrainrotMatchScene extends Phaser.Scene {
   constructor() {
     super('brainrot')
-    this.cols = 8
-    this.rows = 8
-    this.cell = 52
+    this.cols = 6
+    this.rows = 6
+    this.cell = 68
     this.offsetX = 0
     this.offsetY = 0
     this.tiles = []
@@ -49,8 +49,9 @@ class BrainrotMatchScene extends Phaser.Scene {
 
     // Bottom action bar visual polish
     this.add.rectangle(width / 2, height - 38, width - 20, 54, 0x111827, 0.86).setStrokeStyle(2, 0x334155, 0.9)
-    this.add.text(28, height - 49, '⚡ POWERUPS', { fontSize: '15px', color: '#93c5fd', fontStyle: '800' })
-    this.add.text(width - 24, height - 49, '💥 CHAOS ON', { fontSize: '15px', color: '#fda4af', fontStyle: '800' }).setOrigin(1, 0)
+    this.add.text(22, height - 52, '⚡ POWERUPS', { fontSize: '15px', color: '#93c5fd', fontStyle: '800' })
+    this.add.text(22, height - 30, 'Swipe tiles to swap', { fontSize: '14px', color: '#cbd5e1', fontStyle: '700' })
+    this.add.text(width - 22, height - 49, '💥 CHAOS ON', { fontSize: '15px', color: '#fda4af', fontStyle: '800' }).setOrigin(1, 0)
 
     this.offsetX = Math.floor((width - this.cols * this.cell) / 2)
     this.offsetY = Math.floor(height / 2 + 28 - (this.rows * this.cell) / 2)
@@ -58,7 +59,7 @@ class BrainrotMatchScene extends Phaser.Scene {
     this.overlay = this.add.container(width / 2, height / 2)
     const panel = this.add.rectangle(0, 0, width - 40, 250, 0x020617, 0.94).setStrokeStyle(2, 0xf472b6, 0.7)
     const t1 = this.add.text(0, -70, '💀 MEME CASCADE MODE 💀', { fontSize: '30px', color: '#f0abfc', fontStyle: '900' }).setOrigin(0.5)
-    const t2 = this.add.text(0, -14, 'Match meme tiles. Trigger cursed powerups.', { fontSize: '18px', color: '#d1d5db' }).setOrigin(0.5)
+    const t2 = this.add.text(0, -14, 'Swipe meme tiles. Trigger cursed powerups.', { fontSize: '18px', color: '#d1d5db' }).setOrigin(0.5)
     const t3 = this.add.text(0, 18, '4-match = ROW/COL MEME BLAST • 5-match = BOMB', { fontSize: '15px', color: '#93c5fd', fontStyle: '700' }).setOrigin(0.5)
     const cta = this.add.text(0, 82, 'TAP TO START', { fontSize: '36px', color: '#fde047', fontStyle: '900', stroke: '#854d0e', strokeThickness: 5 }).setOrigin(0.5)
     this.tweens.add({ targets: cta, scale: 1.08, yoyo: true, repeat: -1, duration: 460 })
@@ -205,40 +206,76 @@ class BrainrotMatchScene extends Phaser.Scene {
   }
 
   enableInput() {
+    let dragStart = null
+
     this.input.on('pointerdown', (p) => {
       if (this.busy) return
       const picked = this.pickTile(p.worldX, p.worldY)
       if (!picked) return
-
-      const { r, c } = picked
-      const tile = this.tiles[r][c]
-      if (!tile) return
-
-      if (!this.selected) {
-        this.selected = { r, c }
-        this.highlight(tile, true)
-        return
-      }
-
-      const first = this.selected
-      if (first.r === r && first.c === c) {
-        this.highlight(tile, false)
-        this.selected = null
-        return
-      }
-
-      const firstTile = this.tiles[first.r][first.c]
-      if (!this.isAdjacent(first, { r, c })) {
-        this.highlight(firstTile, false)
-        this.selected = { r, c }
-        this.highlight(tile, true)
-        return
-      }
-
-      this.highlight(firstTile, false)
-      this.selected = null
-      this.trySwap(first, { r, c })
+      dragStart = { ...picked, x: p.worldX, y: p.worldY }
+      const t = this.tiles[picked.r][picked.c]
+      if (t) this.highlight(t, true)
     })
+
+    const finishDrag = (p) => {
+      if (!dragStart || this.busy) { dragStart = null; return }
+      const start = { r: dragStart.r, c: dragStart.c }
+      const startTile = this.tiles[start.r]?.[start.c]
+      if (startTile) this.highlight(startTile, false)
+
+      const dx = p.worldX - dragStart.x
+      const dy = p.worldY - dragStart.y
+      const absX = Math.abs(dx)
+      const absY = Math.abs(dy)
+
+      // swipe threshold; fallback to tap-select behavior if short drag
+      let target = null
+      if (Math.max(absX, absY) >= 18) {
+        if (absX > absY) target = { r: start.r, c: start.c + (dx > 0 ? 1 : -1) }
+        else target = { r: start.r + (dy > 0 ? 1 : -1), c: start.c }
+      } else {
+        // single tap selects, second adjacent tap swaps
+        const picked = this.pickTile(p.worldX, p.worldY)
+        if (picked) {
+          if (!this.selected) {
+            this.selected = picked
+            const t = this.tiles[picked.r]?.[picked.c]
+            if (t) this.highlight(t, true)
+            dragStart = null
+            return
+          }
+          const first = this.selected
+          const firstTile2 = this.tiles[first.r]?.[first.c]
+          if (first.r === picked.r && first.c === picked.c) {
+            if (firstTile2) this.highlight(firstTile2, false)
+            this.selected = null
+            dragStart = null
+            return
+          }
+          if (this.isAdjacent(first, picked)) {
+            if (firstTile2) this.highlight(firstTile2, false)
+            this.selected = null
+            this.trySwap(first, picked)
+            dragStart = null
+            return
+          }
+          if (firstTile2) this.highlight(firstTile2, false)
+          this.selected = picked
+          const t = this.tiles[picked.r]?.[picked.c]
+          if (t) this.highlight(t, true)
+          dragStart = null
+          return
+        }
+      }
+
+      if (target && target.r >= 0 && target.r < this.rows && target.c >= 0 && target.c < this.cols) {
+        this.trySwap(start, target)
+      }
+      dragStart = null
+    }
+
+    this.input.on('pointerup', finishDrag)
+    this.input.on('pointerupoutside', finishDrag)
   }
 
   pickTile(x, y) {
